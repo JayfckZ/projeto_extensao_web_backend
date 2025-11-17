@@ -1,158 +1,199 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
+import Header from './components/Header'
+import Hero from './components/Hero'
+import FeatureGrid from './components/FeatureGrid'
+import InventorySection from './components/InventorySection'
+import Footer from './components/Footer'
 
-export default function App() {
-    const [projects, setProjects] = useState([])
-    const [newProject, setNewProject] = useState({ name: '', description: ''})
-    const [editingProject, setEditingProject] = useState(null)
+const API_BASE_URL = 'http://localhost:5000'
 
+const App = () => {
+    const [darkMode, setDarkMode] = useState(false)
+
+    const [items, setItems] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
+
+    const [formData, setFormData] = useState({
+        name: '',
+        category: '',
+        quantity: '',
+        entryDate: '',
+        expirationDate: ''
+    })
+
+
+    const [editingId, setEditingId] = useState(null)
 
     useEffect(() => {
-        axios.get('http://localhost:5000/projects')
-        .then(res => {
-            setProjects(res.data)
-        })
-        .catch(err => {
-            console.error('Houve um erro ao buscar os projetos:', err)
-        })
+        const fetchItems = async () => {
+            try {
+                const res = await axios.get(`${API_BASE_URL}/projects`)
+                setItems(res.data || [])
+            } catch (err) {
+                console.error('Erro ao buscar mantimentos', err)
+                setError('Não foi possível carregar os mantimentos.')
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchItems()
     }, [])
 
-    const handleInputChange = (e) => {
-        const {name, value} = e.target;
-        setNewProject(prevState => ({...prevState, [name]: value}))
+    const handleToggleDarkMode = () => {
+        setDarkMode(prev => !prev)
     }
 
-    const handleAddProject = () => {
-        axios.post('http://localhost:5000/projects', newProject)
-        .then(res => {
-            setProjects([...projects, { ...newProject, _id: res.data}])
-            setNewProject({name: '', description: ''});
-            scrollToSection('projectList')
+    const handleChange = e => {
+        const { name, value } = e.target
+        setFormData(prev => ({
+        ...prev,
+        [name]: value
+        }))
+    }
+
+    const resetForm = () => {
+        setFormData({
+            name: '',
+            category: '',
+            quantity: '',
+            entryDate: ''
         })
-        .catch(err => console.error('Erro ao adicionar projeto:', err))
+        setEditingId(null)
     }
 
-    const handleDeleteProject = (projectId) => {
-        axios.delete(`http://localhost:5000/projects/${projectId}`)
-        .then(res => {
-            setProjects(projects.filter(project => project._id !== projectId))
+    const handleSubmit = async e => {
+        e.preventDefault()
+
+        if (!formData.name.trim()) return
+
+        try {
+            if (editingId) {
+                await axios.put(`${API_BASE_URL}/projects/${editingId}`, formData)
+
+                setItems(prev =>
+                prev.map(item =>
+                    item._id === editingId ? { ...item, ...formData } : item
+                )
+                )
+            } else {
+                const res = await axios.post(`${API_BASE_URL}/projects`, formData)
+                setItems(prev => [...prev, { ...formData, _id: res.data }])
+            }
+
+            resetForm()
+        } catch (err) {
+            console.error('Erro ao salvar mantimento', err)
+            setError('Erro ao salvar mantimento. Tente novamente.')
+        }
+    }
+
+    const handleEdit = item => {
+            setEditingId(item._id)
+            setFormData({
+            name: item.name || '',
+            category: item.category || '',
+            quantity: item.quantity || '',
+            entryDate: item.entryDate || ''
         })
-        .catch(err => console.error('Erro ao deletar projeto:', err))
-    }
 
-    const handleEditProject = (project) => {
-        setEditingProject(project._id)
-        setNewProject({ name: project.name, description: project.description })
-        scrollToSection(`updateProject_${project._id}`)
-    }
-
-    const handleUpdateProject = () => {
-        axios.put(`http://localhost:5000/projects/${editingProject}`, newProject)
-        .then(res => {
-            setProjects(projects => projects.map(project => (
-                project._id === editingProject ? { ...project, ...newProject} : project
-            )))
-            setEditingProject(null)
-            setNewProject({ name: '', description: '' })
-        })
-        .catch(err => console.error('Erro ao atualizar o projeto:', err))
-    }
-
-    const scrollToSection = (sectionId) => {
-        const element = document.getElementById(sectionId)
+        const element = document.getElementById('inventory')
+        
         if (element) {
             element.scrollIntoView({ behavior: 'smooth' })
         }
     }
 
+    const handleDelete = async id => {
+        if (!window.confirm('Tem certeza que deseja excluir este mantimento?')) {
+            return
+        }
+
+        try {
+            await axios.delete(`${API_BASE_URL}/projects/${id}`)
+            setItems(prev => prev.filter(item => item._id !== id))
+        } catch (err) {
+            console.error('Erro ao deletar mantimento', err)
+            setError('Erro ao excluir mantimento.')
+        }
+    }
+
     return (
-        <div>
-            {/* Menu superior */}
-            <nav style={{ backgroundColor: '#f5f5f5', padding: '10px', marginBottom: '20px'}}>
-                <button
-                    onClick={() => scrollToSection('projectList')}
-                >
-                    Lista de projetos
-                </button>
-            </nav>
+        <div className={darkMode ? 'dark' : ''}>
+            <div className='min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100'>
+                <Header darkMode={darkMode} onToggleDarkMode={handleToggleDarkMode} />
 
-            {/* Seção de Lista */}
-            <section id='projectList'>
-                <h2>Lista de projetos da ONG</h2>
-                {projects.length === 0 ? (
-                    <p>Nenhum projeto foi adicionado</p>
-                ) : (
-                    <ul>
-                        {projects.map((project, index) => (
-                            <li key={project._id}>
-                                <strong>{index+1}. Nome:</strong> {project.name}
-                                <strong>Descrição:</strong> {project.description}
-                                <br />
-                                <button
-                                    onClick={() => handleDeleteProject(project._id)}
-                                >
-                                    Deletar
-                                </button>
-                                <button
-                                    onClick={() => handleEditProject(project)}
-                                >
-                                    Editar
-                                </button>
-                                {editingProject === project._id && (
-                                    <section id={`updateProject_${project._id}`} style={{ marginTop: '20px'}}>
-                                        <h3>Atualizar projeto</h3>
-                                        <input
-                                            type='text'
-                                            name='name'
-                                            value={newProject.name}
-                                            onChange={handleInputChange}
-                                            placeholder='Nome do projeto'
-                                        />
-                                        <input
-                                            type='text'
-                                            name='description'
-                                            value={newProject.description}
-                                            onChange={handleInputChange}
-                                            placeholder='Descrição do projeto'
-                                        />
-                                        <br />
-                                        <button
-                                            onClick={handleUpdateProject}
-                                        >
-                                            Salvar alterações
-                                        </button>
-                                    </section>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </section>
+                <main className='pt-16'>
+                <Hero />
 
-            {/* Seção para adicionar Novo Projeto */}
-            <section id="addProject" style={{ marginTop: '50px'}}>
-                <h2>Adicionar projeto</h2>
-                <input
-                    type='text'
-                    name='name'
-                    value={newProject.name}
-                    onChange={handleInputChange}
-                    placeholder='Nome do projeto'
-                />
-                <input
-                    type='text'
-                    name='description'
-                    value={newProject.description}
-                    onChange={handleInputChange}
-                    placeholder='Descrição do projeto'
-                />
-                <br />
-                <button
-                    onClick={handleAddProject}
-                >
-                    Adicionar projeto
-                </button>
-            </section>
+                <section id='sobre' className='py-16 md:py-20 bg-slate-100 dark:bg-slate-900'>
+                    <div className='max-w-5xl mx-auto px-4'>
+                    <h2 className='text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-4'>
+                        Sobre o Sistema
+                    </h2>
+                    <p className='text-slate-600 dark:text-slate-300 leading-relaxed text-lg'>
+                        O sistema da ONG Alimentos Solidários foi desenvolvido para apoiar
+                        organizações na gestão de mantimentos não perecíveis destinados a
+                        comunidades em situação de vulnerabilidade. A aplicação facilita o
+                        controle de estoque, permitindo registrar entradas, saídas, categorias,
+                        quantidades e datas, garantindo maior transparência e organização no uso
+                        das doações.
+                    </p>
+                    </div>
+                </section>
+
+                <section id='funcionalidades' className='py-16 md:py-20 bg-slate-50 dark:bg-slate-950/60'>
+                    <FeatureGrid />
+                </section>
+
+                <section id='sistema' className='py-16 md:py-20 bg-slate-100 dark:bg-slate-900'>
+                    <InventorySection
+                    items={items}
+                    loading={loading}
+                    error={error}
+                    formData={formData}
+                    onChange={handleChange}
+                    onSubmit={handleSubmit}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    editingId={editingId}
+                    />
+                </section>
+
+                <section id='equipe' className='py-16 md:py-20 bg-slate-50 dark:bg-slate-950/60'>
+                    <div className='max-w-5xl mx-auto px-4 text-center'>
+                    <h2 className='text-3xl md:text-4xl font-bold mb-4 text-slate-900 dark:text-white'>
+                        Equipe
+                    </h2>
+                    <p className='text-slate-600 dark:text-slate-300 max-w-3xl mx-auto'>
+                        Este projeto pode ser apresentado como trabalho acadêmico ou prova de
+                        conceito para ONGs. Aqui você pode descrever os integrantes da equipe,
+                        papéis e responsabilidades, reforçando o foco em impacto social e
+                        tecnologia acessível.
+                    </p>
+                    </div>
+                </section>
+
+                <section id='contato' className='py-16 md:py-20 bg-slate-100 dark:bg-slate-900'>
+                    <div className='max-w-4xl mx-auto px-4 text-center'>
+                    <h2 className='text-3xl md:text-4xl font-bold mb-4 text-slate-900 dark:text-white'>
+                        Contato
+                    </h2>
+                    <p className='text-slate-600 dark:text-slate-300 mb-6'>
+                        Para dúvidas, sugestões ou interesse em utilizar ou evoluir este sistema,
+                        você pode incluir aqui um e-mail de contato, formulário ou link para
+                        repositório.
+                    </p>
+                    </div>
+                </section>
+                </main>
+
+                <Footer />
+            </div>
         </div>
-    )
-}
+        )
+    }
+
+export default App

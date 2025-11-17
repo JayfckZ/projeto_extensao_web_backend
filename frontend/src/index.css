@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    @apply bg-slate-100 text-slate-900;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.hero-bg {
+    @apply relative overflow-hidden bg-slate-900 text-white;
+}
+
+.hero-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top left, rgba(52, 152, 219, 0.4), transparent 55%),
+                radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.9), transparent 60%);
+    opacity: 0.85;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.feature-card {
+    @apply bg-white dark:bg-slate-800 rounded-2xl shadow-soft p-6 transition transform hover:-translate-y-1 hover:shadow-xl;
+}
+
+.table-card {
+    @apply bg-white dark:bg-slate-800 rounded-2xl shadow-soft overflow-hidden;
+}
+
+.nav-badge {
+    @apply text-xs uppercase tracking-wide text-slate-300;
+}
