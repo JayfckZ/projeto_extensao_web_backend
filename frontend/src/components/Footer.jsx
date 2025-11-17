@@ -7,9 +7,6 @@ const Footer = () => {
                 <span>
                     ONG Alimentos Solidários · Sistema de Gestão de Mantimentos
                 </span>
-                <span>
-                    Desenvolvido como solução web para apoio a ONGs e projetos sociais
-                </span>
             </div>
         </footer>
     )

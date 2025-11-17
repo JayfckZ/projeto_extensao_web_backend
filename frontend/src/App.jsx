@@ -14,6 +14,10 @@ const App = () => {
     const [items, setItems] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [selectedItem, setSelectedItem] = useState(null)
+    const [search, setSearch] = useState('')
+    const [report, setReport] = useState(null)
+
 
     const [formData, setFormData] = useState({
         name: '',
@@ -29,7 +33,7 @@ const App = () => {
     useEffect(() => {
         const fetchItems = async () => {
             try {
-                const res = await axios.get(`${API_BASE_URL}/projects`)
+                const res = await axios.get(`${API_BASE_URL}/supplies`)
                 setItems(res.data || [])
             } catch (err) {
                 console.error('Erro ao buscar mantimentos', err)
@@ -71,7 +75,7 @@ const App = () => {
 
         try {
             if (editingId) {
-                await axios.put(`${API_BASE_URL}/projects/${editingId}`, formData)
+                await axios.put(`${API_BASE_URL}/supplies/${editingId}`, formData)
 
                 setItems(prev =>
                 prev.map(item =>
@@ -79,7 +83,7 @@ const App = () => {
                 )
                 )
             } else {
-                const res = await axios.post(`${API_BASE_URL}/projects`, formData)
+                const res = await axios.post(`${API_BASE_URL}/supplies`, formData)
                 setItems(prev => [...prev, { ...formData, _id: res.data }])
             }
 
@@ -112,13 +116,44 @@ const App = () => {
         }
 
         try {
-            await axios.delete(`${API_BASE_URL}/projects/${id}`)
+            await axios.delete(`${API_BASE_URL}/supplies/${id}`)
             setItems(prev => prev.filter(item => item._id !== id))
         } catch (err) {
             console.error('Erro ao deletar mantimento', err)
             setError('Erro ao excluir mantimento.')
         }
     }
+
+    const handleViewDetails = async id => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/supplies/${id}`)
+                setSelectedItem(res.data)
+        } catch (err) {
+            console.error("Erro ao buscar detalhes", err)
+        }
+    }
+
+    const handleSearch = async e => {
+        const value = e.target.value
+        setSearch(value)
+
+        try {
+            const res = await axios.get(`${API_BASE_URL}/supplies?name=${value}`)
+            setItems(res.data)
+        } catch (err) {
+            console.error("Erro na busca", err)
+        }
+    }
+
+    const fetchReport = async () => {
+        try {
+            const res = await axios.get(`${API_BASE_URL}/supplies/report`)
+            setReport(res.data)
+        } catch (err) {
+            console.error("Erro ao gerar relatório", err)
+        }
+    }
+
 
     return (
         <div className={darkMode ? 'dark' : ''}>
@@ -150,15 +185,20 @@ const App = () => {
 
                 <section id='sistema' className='py-16 md:py-20 bg-slate-100 dark:bg-slate-900'>
                     <InventorySection
-                    items={items}
-                    loading={loading}
-                    error={error}
-                    formData={formData}
-                    onChange={handleChange}
-                    onSubmit={handleSubmit}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    editingId={editingId}
+                        items={items}
+                        loading={loading}
+                        error={error}
+                        formData={formData}
+                        onChange={handleChange}
+                        onSubmit={handleSubmit}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onSearch={handleSearch}
+                        onViewDetails={handleViewDetails}
+                        selectedItem={selectedItem}
+                        onReport={fetchReport}
+                        report={report}
+                        editingId={editingId}
                     />
                 </section>
 
@@ -168,15 +208,14 @@ const App = () => {
                         Equipe
                     </h2>
                     <p className='text-slate-600 dark:text-slate-300 max-w-3xl mx-auto'>
-                        Este projeto pode ser apresentado como trabalho acadêmico ou prova de
-                        conceito para ONGs. Aqui você pode descrever os integrantes da equipe,
-                        papéis e responsabilidades, reforçando o foco em impacto social e
-                        tecnologia acessível.
+                        Este projeto foi apresentado como trabalho acadêmico com o tema "ONGs".
+                        Grupo composto por: João Marcelo, Thalia Freitas, Ingrid Oliveira,
+                        Maria Eduarda, Mayara Ramos, Amanda de Andrade
                     </p>
                     </div>
                 </section>
 
-                <section id='contato' className='py-16 md:py-20 bg-slate-100 dark:bg-slate-900'>
+                {/* <section id='contato' className='py-16 md:py-20 bg-slate-100 dark:bg-slate-900'>
                     <div className='max-w-4xl mx-auto px-4 text-center'>
                     <h2 className='text-3xl md:text-4xl font-bold mb-4 text-slate-900 dark:text-white'>
                         Contato
@@ -187,7 +226,7 @@ const App = () => {
                         repositório.
                     </p>
                     </div>
-                </section>
+                </section> */}
                 </main>
 
                 <Footer />

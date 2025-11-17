@@ -2,7 +2,7 @@ import React from 'react'
 
 const Hero = () => {
     return (
-        <section className='hero-bg pt-24 pb-24 md:pt-28 md:pb-28'>
+        <section className='hero-bg pt-24 pb-24 md:pt-28 md:pb-28' id='hero'>
             <div className='hero-content max-w-5xl mx-auto px-4 text-center'>
                 <p className='text-sky-200 uppercase text-xs tracking-[0.2em] mb-4'>
                     Sistema Web para ONGs

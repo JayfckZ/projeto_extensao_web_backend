@@ -16,10 +16,26 @@ supplies_collection = db.supplies
 # Rota para retornar todos os Mantimentos (GET)
 @app.route("/supplies", methods=["GET"])
 def get_route():
-    supplies = list(db.supplies.find({}))
+    query = {}
+
+    name = request.args.get("name")
+    category = request.args.get("category")
+    status = request.args.get("status")
+
+    if name:
+        query["name"] = {"$regex": name, "$options": "i"}
+
+    if category:
+        query["category"] = {"$regex": category, "$options": "i"}
+
+    if status:
+        query["status"] = status
+
+    supplies = list(db.supplies.find(query))
 
     for supply in supplies:
         supply["_id"] = str(supply["_id"])
+
     return jsonify(supplies), 200
 
 
@@ -69,88 +85,72 @@ def update_supply(supply_id):
     return jsonify({"error": "Mantimento não encontrado"}), 404
 
 
-def serialize_supply(doc):
-    doc["_id"] = str(doc["_id"])
-    # garante campos padrão mesmo se não existirem
-    doc.setdefault("nome", "")
-    doc.setdefault("categoria", "")
-    doc.setdefault("quantidade", 0)
-    doc.setdefault("status", "desconhecido")
-    doc.setdefault("responsavel", "")
-    doc.setdefault("notas", "")
-    doc.setdefault("data_entrada", None)
-    doc.setdefault("validade", None)
-    return doc
 
-
-@app.route("/supplies", methods=["GET"])
-def list_supplies():
-    query = {}
-
-    name = request.args.get("name")
-    category = request.args.get("category")
-    status = request.args.get("status")
-
-    if name:
-        query["name"] = {"$regex": name, "$options": "i"}
-
-    if category:
-        query["category"] = category
-
-    if status:
-        query["status"] = status
-
-    supplies = [serialize_supply(s) for s in supplies_collection.find(query)]
-
-    return jsonify(supplies), 200
 
 
 @app.route("/supplies/report", methods=["GET"])
-def stock_report():
-    # total de itens por categoria
-    pipeline = [
-        {
-            "$group": {
-                "_id": "$category",
-                "total_quantity": {"$sum": "$quantity"},
-                "items_count": {"$sum": 1},
+def supplies_report():
+    # pegar todos os itens
+    all_items = list(db.supplies.find({}))
+
+    # converter quantidade para número sem mexer no banco
+    def extract_number(qty):
+        if not qty:
+            return 0
+        # extrai o número inicial, ex: "12 unidades" -> 12
+        try:
+            return int(str(qty).split()[0])
+        except:
+            return 0
+
+    # calcular totais
+    category_map = {}
+    total_quantity = 0
+
+    for item in all_items:
+        cat = item.get("category", "Sem categoria")
+        num_qty = extract_number(item.get("quantity"))
+
+        total_quantity += num_qty
+
+        if cat not in category_map:
+            category_map[cat] = {
+                "category": cat,
+                "items_count": 0,
+                "total_quantity": 0
             }
-        }
-    ]
 
-    by_category_raw = list(supplies_collection.aggregate(pipeline))
+        category_map[cat]["items_count"] += 1
+        category_map[cat]["total_quantity"] += num_qty
 
-    by_category = [
-        {
-            "category": item["_id"],
-            "total_quantity": item["total_quantity"],
-            "items_count": item["items_count"],
-        }
-        for item in by_category_raw
-    ]
+    # transformar em lista
+    by_category = list(category_map.values())
 
-    total_items = supplies_collection.count_documents({})
-    total_quantity = sum(c["total_quantity"] for c in by_category)
+    # identificar validade
+    days = int(request.args.get("days", 7))
 
-    # itens prestes a vencer
-    days_to_expire = int(request.args.get("days_to_expire", 7))
-    now = datetime.utcnow()
-    limit_date = now + timedelta(days=days_to_expire)
+    expiring = []
+    for item in all_items:
+        exp = item.get("expirationDate")
+        if exp:
+            try:
+                exp_date = datetime.strptime(exp, "%Y-%m-%d")
+                if exp_date <= datetime.utcnow() + timedelta(days=days):
+                    item["_id"] = str(item["_id"])
+                    expiring.append(item)
+            except:
+                pass
 
-    expiring_cursor = supplies_collection.find(
-        {"expiry_date": {"$ne": None, "$lte": limit_date}}
-    )
-
-    expiring_soon = [serialize_supply(doc) for doc in expiring_cursor]
-
-    report = {
-        "summary": {"total_items": total_items, "total_quantity": total_quantity},
+    return jsonify({
+        "summary": {
+            "total_items": len(all_items),
+            "total_quantity": total_quantity
+        },
         "by_category": by_category,
-        "expiring_soon": expiring_soon,
-        "params": {"days_to_expire": days_to_expire},
-    }
+        "expiring_soon": expiring,
+        "params": {"days": days}
+    }), 200
 
-    return jsonify(report), 200
 
 
 # Ponto de entrada para rodar a aplicação
